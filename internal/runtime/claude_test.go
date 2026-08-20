@@ -177,6 +177,29 @@ func TestBuildRunCommand_NoPlugins(t *testing.T) {
 	assert.NotContains(t, cmd, "--plugin-dir")
 }
 
+func TestBuildRunCommand_WithHooksSettings(t *testing.T) {
+	cmd := buildRunCommand(RunParams{
+		AgentBaseName:     "agent",
+		RepoDir:           "/sandbox/workspace/repo",
+		HooksSettingsPath: "/sandbox/claude-config/hooks.json",
+	})
+	assert.Contains(t, cmd, "--settings '/sandbox/claude-config/hooks.json'")
+}
+
+func TestBuildRunCommand_WithoutHooksSettings(t *testing.T) {
+	cmd := testRunCommand("agent", "", "/sandbox/workspace/repo", nil, "")
+	assert.NotContains(t, cmd, "--settings")
+}
+
+func TestBuildRunCommand_HooksSettingsEscapesQuotes(t *testing.T) {
+	cmd := buildRunCommand(RunParams{
+		AgentBaseName:     "agent",
+		RepoDir:           "/sandbox/workspace/repo",
+		HooksSettingsPath: "/sandbox/path'with'quotes/hooks.json",
+	})
+	assert.Contains(t, cmd, "--settings '/sandbox/path'\\''with'\\''quotes/hooks.json'")
+}
+
 func TestBuildRunCommand_DebugDisabled(t *testing.T) {
 	cmd := testRunCommand("agent", "", "/sandbox/workspace/repo", nil, "")
 	assert.NotContains(t, cmd, "--debug-file")
@@ -190,25 +213,35 @@ func TestBuildRunCommand_DebugEscapesQuotes(t *testing.T) {
 
 func TestBuildRunCommand_NoDoubleSpaces(t *testing.T) {
 	tests := []struct {
-		name       string
-		agentName  string
-		model      string
-		effort     string
-		pluginDirs []string
-		debug      string
+		name              string
+		agentName         string
+		model             string
+		effort            string
+		pluginDirs        []string
+		debug             string
+		hooksSettingsPath string
 	}{
-		{"no optional flags", "agent", "", "", nil, ""},
-		{"model only", "agent", "sonnet", "", nil, ""},
-		{"effort only", "agent", "", "high", nil, ""},
-		{"model and effort", "agent", "sonnet", "xhigh", nil, ""},
-		{"plugins only", "agent", "", "", []string{"/sandbox/plugins/gopls"}, ""},
-		{"debug only", "agent", "", "", nil, "*"},
-		{"debug filtered", "agent", "", "", nil, "api,hooks"},
-		{"all flags", "agent", "sonnet", "max", []string{"/sandbox/plugins/gopls", "/sandbox/plugins/other"}, "api,hooks"},
+		{"no optional flags", "agent", "", "", nil, "", ""},
+		{"model only", "agent", "sonnet", "", nil, "", ""},
+		{"effort only", "agent", "", "high", nil, "", ""},
+		{"model and effort", "agent", "sonnet", "xhigh", nil, "", ""},
+		{"plugins only", "agent", "", "", []string{"/sandbox/plugins/gopls"}, "", ""},
+		{"debug only", "agent", "", "", nil, "*", ""},
+		{"debug filtered", "agent", "", "", nil, "api,hooks", ""},
+		{"hooks settings only", "agent", "", "", nil, "", "/sandbox/claude-config/hooks.json"},
+		{"all flags", "agent", "sonnet", "max", []string{"/sandbox/plugins/gopls", "/sandbox/plugins/other"}, "api,hooks", "/sandbox/claude-config/hooks.json"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := testRunCommandWithEffort(tc.agentName, tc.model, tc.effort, "/sandbox/workspace/repo", tc.pluginDirs, tc.debug)
+			cmd := buildRunCommand(RunParams{
+				AgentBaseName:     tc.agentName,
+				Model:             tc.model,
+				Effort:            tc.effort,
+				RepoDir:           "/sandbox/workspace/repo",
+				PluginDirs:        tc.pluginDirs,
+				Debug:             tc.debug,
+				HooksSettingsPath: tc.hooksSettingsPath,
+			})
 			assert.NotContains(t, cmd, "  ", "command should not contain double spaces")
 		})
 	}

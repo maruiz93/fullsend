@@ -1514,17 +1514,22 @@ func runAgent(ctx context.Context, agentName, fullsendDir, outputBase, targetRep
 
 		agentCtx, agentSpan := tracer.Start(ctx, "agent", trace.WithAttributes(agentSpanStartAttrs(iteration, agentName)...))
 		var metrics agentruntime.RunMetrics
+		hooksSettings := ""
+		if h.SecurityEnabled() {
+			hooksSettings = security.SandboxHooksSettings
+		}
 		exitCode, runErr := rt.Run(agentCtx, agentruntime.RunParams{
-			SandboxName:   sandboxName,
-			AgentBaseName: agentBaseName,
-			Model:         h.Model,
-			Effort:        h.Effort,
-			RepoDir:       remoteRepositoryDir,
-			FullsendDir:   absFullsendDir,
-			PluginDirs:    pluginDirs,
-			Debug:         debug,
-			Timeout:       timeout,
-			OutputPath:    filepath.Join(iterDir, "output.jsonl"),
+			SandboxName:       sandboxName,
+			AgentBaseName:     agentBaseName,
+			Model:             h.Model,
+			Effort:            h.Effort,
+			RepoDir:           remoteRepositoryDir,
+			FullsendDir:       absFullsendDir,
+			PluginDirs:        pluginDirs,
+			Debug:             debug,
+			HooksSettingsPath: hooksSettings,
+			Timeout:           timeout,
+			OutputPath:        filepath.Join(iterDir, "output.jsonl"),
 		}, printer, agentStart, &metrics)
 		close(heartbeatDone)
 

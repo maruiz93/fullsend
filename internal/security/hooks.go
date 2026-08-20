@@ -48,9 +48,15 @@ type claudeSettings struct {
 	Hooks map[string][]hookMatcher `json:"hooks"`
 }
 
-// SandboxHooksDir is the path where hook scripts are installed inside the
-// sandbox. Must match sandbox.SandboxWorkspace + "/.claude/hooks".
-const SandboxHooksDir = sandbox.SandboxWorkspace + "/.claude/hooks"
+// SandboxHooksDir is the directory where hook scripts are installed inside
+// the sandbox. Co-located with SandboxHooksSettings under the runner-owned
+// config directory so they are outside the agent-writable workspace tree.
+const SandboxHooksDir = sandbox.SandboxClaudeConfig + "/hooks"
+
+// SandboxHooksSettings is the path where the hook wiring settings.json is
+// written inside the sandbox. buildRunCommand passes this via --settings so
+// Claude Code loads the hooks regardless of its working directory.
+const SandboxHooksSettings = sandbox.SandboxClaudeConfig + "/hooks.json"
 
 // GenerateClaudeSettings produces a .claude/settings.json with security hooks
 // configured according to hooks. Returns the JSON bytes.

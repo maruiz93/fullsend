@@ -24,17 +24,18 @@ type RunMetrics struct {
 
 // RunParams configures a single agent invocation inside the sandbox.
 type RunParams struct {
-	SandboxName   string
-	AgentBaseName string
-	Model         string
-	Effort        string
-	RepoDir       string
-	FullsendDir   string
-	PluginDirs    []string
-	Debug         string
-	Timeout       time.Duration
-	OutputPath    string           // if set, tee stream-json stdout to this file
-	OnEvent       func(AgentEvent) // if non-nil, called with normalized events during Run
+	SandboxName       string
+	AgentBaseName     string
+	Model             string
+	Effort            string
+	RepoDir           string
+	FullsendDir       string
+	PluginDirs        []string
+	Debug             string
+	HooksSettingsPath string // if set, passed as --settings so Claude Code loads hook wiring
+	Timeout           time.Duration
+	OutputPath        string           // if set, tee stream-json stdout to this file
+	OnEvent           func(AgentEvent) // if non-nil, called with normalized events during Run
 }
 
 // TranscriptError holds extracted error information from a runtime transcript.

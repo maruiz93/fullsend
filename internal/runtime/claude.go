@@ -303,6 +303,10 @@ func buildRunCommand(params RunParams) string {
 		"--output-format stream-json",
 	}
 
+	if params.HooksSettingsPath != "" {
+		parts = append(parts, fmt.Sprintf("--settings '%s'", strings.ReplaceAll(params.HooksSettingsPath, "'", "'\\''")))
+	}
+
 	if params.Debug != "" {
 		parts = append(parts, fmt.Sprintf("--debug-file '%s/%s'", sandbox.SandboxWorkspace, claudeDebugLog))
 		if params.Debug != "*" {
@@ -331,14 +335,17 @@ func buildRunCommand(params RunParams) string {
 	return strings.Join(parts, " ")
 }
 
-// Claude Code reads two settings.json files in the sandbox:
+// Claude Code reads settings from two separate files in the sandbox:
 //   - {CLAUDE_CONFIG_DIR}/settings.json — plugin marketplace state (bootstrapPlugins)
-//   - {SandboxWorkspace}/.claude/settings.json — security Pre/PostToolUse hooks (here)
+//   - {CLAUDE_CONFIG_DIR}/hooks.json    — security Pre/PostToolUse hooks (here)
 //
-// Keep these paths separate; merging them would mix plugin config with hook wiring.
+// The hooks settings file is loaded via --settings in buildRunCommand, which
+// takes precedence over project/local settings. Hook scripts and settings are
+// co-located under the runner-owned config directory, outside the agent-writable
+// workspace tree.
 func installClaudeHooks(sandboxName string, hooks security.ClaudeSandboxHooks) error {
-	hooksDir := sandbox.SandboxWorkspace + "/.claude/hooks"
-	mkdirCmd := fmt.Sprintf("mkdir -p %s %s/.claude", hooksDir, sandbox.SandboxWorkspace)
+	hooksDir := security.SandboxHooksDir
+	mkdirCmd := fmt.Sprintf("mkdir -p %s", hooksDir)
 	if _, _, _, err := sandbox.Exec(sandboxName, mkdirCmd, 10*time.Second); err != nil {
 		return fmt.Errorf("creating Claude hooks dir: %w", err)
 	}
@@ -356,7 +363,7 @@ func installClaudeHooks(sandboxName string, hooks security.ClaudeSandboxHooks) e
 		}
 		tmpFile.Close()
 
-		remotePath := fmt.Sprintf("%s/.claude/hooks/%s", sandbox.SandboxWorkspace, name)
+		remotePath := fmt.Sprintf("%s/%s", hooksDir, name)
 		if err := sandbox.Upload(sandboxName, tmpFile.Name(), remotePath); err != nil {
 			os.Remove(tmpFile.Name())
 			return fmt.Errorf("copying hook %s to sandbox: %w", name, err)
@@ -385,10 +392,9 @@ func installClaudeHooks(sandboxName string, hooks security.ClaudeSandboxHooks) e
 	}
 	tmpSettings.Close()
 
-	remoteSettings := fmt.Sprintf("%s/.claude/settings.json", sandbox.SandboxWorkspace)
-	if err := sandbox.Upload(sandboxName, tmpSettings.Name(), remoteSettings); err != nil {
+	if err := sandbox.Upload(sandboxName, tmpSettings.Name(), security.SandboxHooksSettings); err != nil {
 		os.Remove(tmpSettings.Name())
-		return fmt.Errorf("copying settings.json to sandbox: %w", err)
+		return fmt.Errorf("copying hooks.json to sandbox: %w", err)
 	}
 	os.Remove(tmpSettings.Name())
 
