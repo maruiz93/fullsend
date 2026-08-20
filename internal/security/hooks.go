@@ -43,7 +43,7 @@ type hookMatcher struct {
 	Hooks   []hookEntry `json:"hooks"`
 }
 
-// claudeSettings represents the .claude/settings.json structure.
+// claudeSettings represents the hooks.json structure for Claude Code hook wiring.
 type claudeSettings struct {
 	Hooks map[string][]hookMatcher `json:"hooks"`
 }
@@ -58,7 +58,7 @@ const SandboxHooksDir = sandbox.SandboxClaudeConfig + "/hooks"
 // Claude Code loads the hooks regardless of its working directory.
 const SandboxHooksSettings = sandbox.SandboxClaudeConfig + "/hooks.json"
 
-// GenerateClaudeSettings produces a .claude/settings.json with security hooks
+// GenerateClaudeSettings produces a hooks.json with security hooks
 // configured according to hooks. Returns the JSON bytes.
 func GenerateClaudeSettings(hooks ClaudeSandboxHooks) ([]byte, error) {
 	settings := claudeSettings{
