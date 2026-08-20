@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/fullsend-ai/fullsend/internal/sandbox"
+	"github.com/fullsend-ai/fullsend/internal/security"
 	"github.com/fullsend-ai/fullsend/internal/ui"
 )
 
@@ -465,6 +466,32 @@ func TestClaudeRuntime_Bootstrap_AgentNameEmpty(t *testing.T) {
 		agentName:   "",
 	})
 	assert.NoError(t, err)
+}
+
+// TestInstallClaudeHooks_HappyPath verifies that installClaudeHooks writes
+// hook scripts and a hooks.json settings file to the runner-owned config
+// directory. Uses a stub openshell so sandbox.Exec/Upload succeed without a
+// real sandbox.
+func TestInstallClaudeHooks_HappyPath(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "openshell")
+	require.NoError(t, os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	t.Setenv("PATH", stubDir)
+
+	hooks := security.ClaudeSandboxHooks{} // default hooks (all enabled)
+	err := installClaudeHooks("test-sandbox", hooks)
+	assert.NoError(t, err)
+}
+
+// TestInstallClaudeHooks_OpenshellNotInPath verifies that installClaudeHooks
+// returns an error when openshell is not available.
+func TestInstallClaudeHooks_OpenshellNotInPath(t *testing.T) {
+	t.Setenv("PATH", "")
+
+	hooks := security.ClaudeSandboxHooks{}
+	err := installClaudeHooks("test-sandbox", hooks)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "creating Claude hooks dir")
 }
 
 func TestClaudeRuntime_ClearIterationArtifacts_OpenshellNotInPath(t *testing.T) {
