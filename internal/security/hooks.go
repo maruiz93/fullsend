@@ -61,7 +61,7 @@ const SandboxHooksSettings = sandbox.SandboxClaudeConfig + "/hooks.json"
 // GenerateHooksConfig produces a hooks.json with security hooks
 // configured according to hooks. Returns the JSON bytes.
 func GenerateHooksConfig(hooks ClaudeSandboxHooks) ([]byte, error) {
-	settings := hooksConfig{
+	cfg := hooksConfig{
 		Hooks: make(map[string][]hookMatcher),
 	}
 
@@ -154,13 +154,13 @@ func GenerateHooksConfig(hooks ClaudeSandboxHooks) ([]byte, error) {
 	}
 
 	if len(preToolMatchers) > 0 {
-		settings.Hooks["PreToolUse"] = preToolMatchers
+		cfg.Hooks["PreToolUse"] = preToolMatchers
 	}
 	if len(postToolMatchers) > 0 {
-		settings.Hooks["PostToolUse"] = postToolMatchers
+		cfg.Hooks["PostToolUse"] = postToolMatchers
 	}
 
-	return json.MarshalIndent(settings, "", "  ")
+	return json.MarshalIndent(cfg, "", "  ")
 }
 
 // HookFiles returns a map of filename -> content for all enabled hook scripts.
