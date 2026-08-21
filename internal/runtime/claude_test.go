@@ -483,6 +483,22 @@ func TestInstallClaudeHooks_HappyPath(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestInstallClaudeHooks_SettingsUploadError verifies that installClaudeHooks
+// returns a descriptive error when the hooks.json settings upload fails.
+func TestInstallClaudeHooks_SettingsUploadError(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "openshell")
+	// Stub that succeeds for all operations except the hooks.json upload.
+	script := "#!/bin/sh\ncase \"$5\" in *hooks.json) exit 1 ;; esac\nexit 0\n"
+	require.NoError(t, os.WriteFile(stubPath, []byte(script), 0o755))
+	t.Setenv("PATH", stubDir)
+
+	hooks := security.ClaudeSandboxHooks{} // default hooks (all enabled)
+	err := installClaudeHooks("test-sandbox", hooks)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "copying hooks.json to sandbox")
+}
+
 // TestInstallClaudeHooks_OpenshellNotInPath verifies that installClaudeHooks
 // returns an error when openshell is not available.
 func TestInstallClaudeHooks_OpenshellNotInPath(t *testing.T) {

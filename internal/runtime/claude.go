@@ -376,9 +376,9 @@ func installClaudeHooks(sandboxName string, hooks security.ClaudeSandboxHooks) e
 		}
 	}
 
-	settingsJSON, err := security.GenerateClaudeSettings(hooks)
+	settingsJSON, err := security.GenerateHooksConfig(hooks)
 	if err != nil {
-		return fmt.Errorf("generating claude settings: %w", err)
+		return fmt.Errorf("generating hooks config: %w", err)
 	}
 
 	tmpSettings, err := os.CreateTemp("", "fullsend-settings-*.json")
