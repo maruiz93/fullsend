@@ -138,7 +138,7 @@ def _parse_egress_allowlist() -> set[tuple[str, int]]:
         if ":" in entry:
             host, _, port_str = entry.rpartition(":")
             try:
-                entries.add((host.lower().rstrip("."), int(port_str)))
+                entries.add((host.strip("[]").lower().rstrip("."), int(port_str)))
             except ValueError:
                 continue
         else:

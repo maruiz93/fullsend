@@ -596,6 +596,17 @@ func TestParseEgressAllowlist(t *testing.T) {
 		m := ParseEgressAllowlist("Host.Internal:443")
 		assert.True(t, m["host.internal:443"])
 	})
+
+	t.Run("ipv6 brackets stripped", func(t *testing.T) {
+		m := ParseEgressAllowlist("[::1]:443")
+		assert.True(t, m["::1:443"])
+		assert.False(t, m["[::1]:443"])
+	})
+
+	t.Run("ipv6 full address brackets stripped", func(t *testing.T) {
+		m := ParseEgressAllowlist("[2001:db8::1]:8443")
+		assert.True(t, m["2001:db8::1:8443"])
+	})
 }
 
 func TestSSRFValidator_EgressAllowlist(t *testing.T) {
@@ -603,6 +614,10 @@ func TestSSRFValidator_EgressAllowlist(t *testing.T) {
 		v := NewSSRFValidatorWithAllowlist(unresolvableTestHost + ":443")
 		r := v.ValidateURL("https://"+unresolvableTestHost+"/api", true)
 		assert.True(t, r.Safe)
+		// Audit finding must be present for parity with the Python hook's
+		// log_finding() call on the same code path.
+		assert.True(t, hasFinding(r, "egress_allowlist_bypass"),
+			"expected egress_allowlist_bypass audit finding")
 	})
 
 	t.Run("non-allowlisted host DNS failure still blocks", func(t *testing.T) {
@@ -656,5 +671,21 @@ func TestSSRFValidator_EgressAllowlist(t *testing.T) {
 		r := v.ValidateURL("http://10.0.0.1/internal", false)
 		assert.False(t, r.Safe)
 		assert.True(t, hasFinding(r, "blocked_ip"))
+	})
+
+	t.Run("ipv6 bracket allowlist entry matches url.Hostname", func(t *testing.T) {
+		// url.Parse().Hostname() strips brackets from IPv6 addresses, so
+		// allowlist entries with brackets must also be stored without them.
+		v := NewSSRFValidatorWithAllowlist("[" + unresolvableTestHost + "]:443")
+		r := v.ValidateURL("https://"+unresolvableTestHost+"/api", true)
+		assert.True(t, r.Safe)
+		assert.True(t, hasFinding(r, "egress_allowlist_bypass"))
+	})
+
+	t.Run("allowlisted host wildcard port has audit finding", func(t *testing.T) {
+		v := NewSSRFValidatorWithAllowlist(unresolvableTestHost)
+		r := v.ValidateURL("https://"+unresolvableTestHost+":8080/api", true)
+		assert.True(t, r.Safe)
+		assert.True(t, hasFinding(r, "egress_allowlist_bypass"))
 	})
 }

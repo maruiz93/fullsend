@@ -68,7 +68,7 @@ func ParseEgressAllowlist(raw string) map[string]bool {
 		// requires bracket notation for IPv6 and errors on entries without a
 		// port — both of which are valid allowlist formats here.
 		if idx := strings.LastIndex(entry, ":"); idx > 0 {
-			host := strings.ToLower(strings.TrimSuffix(entry[:idx], "."))
+			host := strings.Trim(strings.ToLower(strings.TrimSuffix(entry[:idx], ".")), "[]")
 			port := entry[idx+1:]
 			if _, err := strconv.Atoi(port); err == nil {
 				m[host+":"+port] = true
@@ -212,6 +212,18 @@ func (s *SSRFValidator) ValidateURL(rawURL string, resolveDNS bool) ScanResult {
 						Detail:   fmt.Sprintf("DNS resolution failed for %s (fail-closed)", hostname),
 					}},
 				}
+			}
+			// Audit log: DNS failed but host is allowlisted — deferring
+			// to L7 proxy.  Mirrors the Python hook's log_finding() call
+			// so the bypass is visible in scan results.
+			return ScanResult{
+				Safe: true,
+				Findings: []Finding{{
+					Scanner:  "ssrf_validator",
+					Name:     "egress_allowlist_bypass",
+					Severity: "info",
+					Detail:   fmt.Sprintf("DNS failed for %s:%s; allowlisted — deferring to L7 proxy", hostname, port),
+				}},
 			}
 		} else {
 			for _, addr := range addrs {

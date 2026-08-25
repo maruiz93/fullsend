@@ -1033,6 +1033,20 @@ class TestEgressAllowlistParsing:
             assert ("a.internal", 443) in result
             assert ("b.internal", 8443) in result
 
+    def test_ipv6_brackets_stripped(self, hook):
+        with mock.patch.dict(os.environ, {"FULLSEND_EGRESS_ALLOWLIST": "[::1]:443"}):
+            result = hook._parse_egress_allowlist()
+            assert ("::1", 443) in result
+            assert ("[::1]", 443) not in result
+
+    def test_ipv6_full_address_brackets_stripped(self, hook):
+        with mock.patch.dict(
+            os.environ,
+            {"FULLSEND_EGRESS_ALLOWLIST": "[2001:db8::1]:8443"},
+        ):
+            result = hook._parse_egress_allowlist()
+            assert ("2001:db8::1", 8443) in result
+
 
 class TestEgressAllowlistValidateUrl:
     """Verify validate_url respects the egress allowlist on DNS failure."""
@@ -1143,3 +1157,18 @@ class TestEgressAllowlistValidateUrl:
                 result = hook.validate_url(url)
                 assert result is not None
                 assert "fail-closed" in result
+
+    def test_ipv6_bracket_allowlist_entry_matches(self, hook):
+        """IPv6 allowlist entry with brackets matches urlparse().hostname (no brackets)."""
+        # urlparse("https://[::1]:443/").hostname returns "::1" (no brackets),
+        # so a bracket-notation allowlist entry must strip brackets to match.
+        url = "https://internal.host/api"
+        with (
+            mock.patch("socket.getaddrinfo", side_effect=socket.gaierror("no DNS")),
+            mock.patch.dict(
+                os.environ,
+                {"FULLSEND_EGRESS_ALLOWLIST": "[internal.host]:443"},
+            ),
+        ):
+            result = hook.validate_url(url)
+            assert result is None  # allowed
