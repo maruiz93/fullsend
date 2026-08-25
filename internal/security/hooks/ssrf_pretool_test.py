@@ -1047,6 +1047,17 @@ class TestEgressAllowlistParsing:
             result = hook._parse_egress_allowlist()
             assert ("2001:db8::1", 8443) in result
 
+    def test_wildcard_entries_ignored(self, hook, capsys):
+        with mock.patch.dict(
+            os.environ,
+            {"FULLSEND_EGRESS_ALLOWLIST": "*.internal:443,exact.host:8443"},
+        ):
+            result = hook._parse_egress_allowlist()
+            assert len(result) == 1
+            assert ("exact.host", 8443) in result
+            captured = capsys.readouterr()
+            assert "wildcard entry '*.internal:443'" in captured.err
+
 
 class TestEgressAllowlistValidateUrl:
     """Verify validate_url respects the egress allowlist on DNS failure."""

@@ -135,6 +135,13 @@ def _parse_egress_allowlist() -> set[tuple[str, int]]:
         entry = entry.strip()
         if not entry:
             continue
+        if "*" in entry:
+            print(
+                f"WARNING: wildcard entry '{entry}' in FULLSEND_EGRESS_ALLOWLIST "
+                "is not supported and will be ignored — use exact hostnames",
+                file=sys.stderr,
+            )
+            continue
         if ":" in entry:
             host, _, port_str = entry.rpartition(":")
             try:
