@@ -120,6 +120,7 @@ security:                        # Security is enabled by default with fail_mode
       enabled: true
       fail_on: high              # "critical", "high", or "medium"
     ssrf_pretool: true
+    ssrf_egress_allowlist: ""       # comma-separated host:port entries (e.g. "gitlab.internal:443,other.host:8443")
     secret_redact_posttool: true
     unicode_posttool: true
     context_suppress_posttool: true
