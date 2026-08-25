@@ -995,7 +995,6 @@ class TestEgressAllowlistParsing:
 
     def test_empty_env(self, hook):
         with mock.patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("FULLSEND_EGRESS_ALLOWLIST", None)
             assert hook._parse_egress_allowlist() == set()
 
     def test_single_entry(self, hook):

@@ -123,6 +123,9 @@ def _parse_egress_allowlist() -> set[tuple[str, int]]:
 
     The env var contains comma-separated host:port entries, e.g.:
         gitlab.cee.redhat.com:443,other.internal:8443
+
+    Entries without a port (e.g. ``host.internal``) use port ``0`` as a
+    wildcard sentinel, meaning any port matches during allowlist lookup.
     """
     raw = os.environ.get("FULLSEND_EGRESS_ALLOWLIST", "")
     if not raw.strip():
@@ -145,7 +148,11 @@ def _parse_egress_allowlist() -> set[tuple[str, int]]:
 
 
 def _is_host_allowlisted(hostname: str, port: int | None) -> bool:
-    """Return True if hostname:port is on the egress allowlist."""
+    """Return True if hostname:port is on the egress allowlist.
+
+    When *port* is ``None``, only wildcard (port ``0``) allowlist entries
+    match — an exact host:port entry will not be considered.
+    """
     allowlist = _parse_egress_allowlist()
     if not allowlist:
         return False
@@ -214,8 +221,12 @@ def validate_url(url: str) -> str | None:
     if ip_reason:
         return ip_reason
 
-    # Determine the port for allowlist matching.
-    port = parsed.port
+    # Determine the effective port for the URL (used for allowlist matching
+    # and default-port inference when the URL omits an explicit port).
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
     if port is None:
         port = 443 if scheme == "https" else 80
 
@@ -234,6 +245,13 @@ def validate_url(url: str) -> str | None:
         # allowlist (the L7 proxy will resolve and enforce the policy).
         if not _is_host_allowlisted(hostname, port):
             return f"DNS resolution failed for {hostname} (fail-closed)"
+        log_finding(
+            scanner="ssrf",
+            name="egress_allowlist_bypass",
+            severity="info",
+            detail=f"DNS failed for {hostname}:{port}; allowlisted — deferring to L7 proxy",
+            action="allow",
+        )
     finally:
         socket.setdefaulttimeout(prev_timeout)
 

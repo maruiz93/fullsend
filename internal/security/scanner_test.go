@@ -555,6 +555,10 @@ func hasFinding(r ScanResult, name string) bool {
 	return false
 }
 
+// unresolvableTestHost is a hostname guaranteed not to resolve, used across
+// egress-allowlist tests to trigger the DNS-failure code path.
+const unresolvableTestHost = "this-host-does-not-exist-fullsend-test.invalid"
+
 func TestParseEgressAllowlist(t *testing.T) {
 	t.Run("empty string", func(t *testing.T) {
 		m := ParseEgressAllowlist("")
@@ -596,28 +600,28 @@ func TestParseEgressAllowlist(t *testing.T) {
 
 func TestSSRFValidator_EgressAllowlist(t *testing.T) {
 	t.Run("allowlisted host with DNS failure is allowed", func(t *testing.T) {
-		v := NewSSRFValidatorWithAllowlist("this-host-does-not-exist-fullsend-test.invalid:443")
-		r := v.ValidateURL("https://this-host-does-not-exist-fullsend-test.invalid/api", true)
+		v := NewSSRFValidatorWithAllowlist(unresolvableTestHost + ":443")
+		r := v.ValidateURL("https://"+unresolvableTestHost+"/api", true)
 		assert.True(t, r.Safe)
 	})
 
 	t.Run("non-allowlisted host DNS failure still blocks", func(t *testing.T) {
 		v := NewSSRFValidatorWithAllowlist("other.host:443")
-		r := v.ValidateURL("https://this-host-does-not-exist-fullsend-test.invalid/", true)
+		r := v.ValidateURL("https://"+unresolvableTestHost+"/", true)
 		assert.False(t, r.Safe)
 		assert.True(t, hasFinding(r, "dns_failure"))
 	})
 
 	t.Run("allowlisted host wrong port still blocks", func(t *testing.T) {
-		v := NewSSRFValidatorWithAllowlist("this-host-does-not-exist-fullsend-test.invalid:8443")
-		r := v.ValidateURL("https://this-host-does-not-exist-fullsend-test.invalid/api", true)
+		v := NewSSRFValidatorWithAllowlist(unresolvableTestHost + ":8443")
+		r := v.ValidateURL("https://"+unresolvableTestHost+"/api", true)
 		assert.False(t, r.Safe)
 		assert.True(t, hasFinding(r, "dns_failure"))
 	})
 
 	t.Run("allowlisted host wildcard port", func(t *testing.T) {
-		v := NewSSRFValidatorWithAllowlist("this-host-does-not-exist-fullsend-test.invalid")
-		r := v.ValidateURL("https://this-host-does-not-exist-fullsend-test.invalid:8080/api", true)
+		v := NewSSRFValidatorWithAllowlist(unresolvableTestHost)
+		r := v.ValidateURL("https://"+unresolvableTestHost+":8080/api", true)
 		assert.True(t, r.Safe)
 	})
 
@@ -635,7 +639,7 @@ func TestSSRFValidator_EgressAllowlist(t *testing.T) {
 
 	t.Run("empty allowlist does not change behavior", func(t *testing.T) {
 		v := NewSSRFValidatorWithAllowlist("")
-		r := v.ValidateURL("https://this-host-does-not-exist-fullsend-test.invalid/", true)
+		r := v.ValidateURL("https://"+unresolvableTestHost+"/", true)
 		assert.False(t, r.Safe)
 		assert.True(t, hasFinding(r, "dns_failure"))
 	})

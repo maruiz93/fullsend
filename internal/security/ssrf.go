@@ -64,6 +64,9 @@ func ParseEgressAllowlist(raw string) map[string]bool {
 		if entry == "" {
 			continue
 		}
+		// Use LastIndex instead of net.SplitHostPort because SplitHostPort
+		// requires bracket notation for IPv6 and errors on entries without a
+		// port — both of which are valid allowlist formats here.
 		if idx := strings.LastIndex(entry, ":"); idx > 0 {
 			host := strings.ToLower(strings.TrimSuffix(entry[:idx], "."))
 			port := entry[idx+1:]

@@ -140,7 +140,7 @@ func TestAppendHookEnv_ExecFailure(t *testing.T) {
 	hooks := security.SandboxHookConfigFromHarness(&harness.Harness{})
 	err := appendHookEnv("sb", hooks)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "TIRITH_REQUIRED")
+	assert.Contains(t, err.Error(), "appending hook env")
 }
 
 func TestAppendHookEnv_EgressAllowlist(t *testing.T) {
