@@ -118,6 +118,45 @@ _SHELL_REENTRY = re.compile(r"\b(?:bash|sh|dash|zsh|ksh)\s+(?:-\S+\s+)*-c\b|\bev
 FINDINGS_PATH = "/sandbox/workspace/.security/findings.jsonl"
 
 
+def _parse_egress_allowlist() -> set[tuple[str, int]]:
+    """Parse FULLSEND_EGRESS_ALLOWLIST env var into a set of (hostname, port) tuples.
+
+    The env var contains comma-separated host:port entries, e.g.:
+        gitlab.cee.redhat.com:443,other.internal:8443
+    """
+    raw = os.environ.get("FULLSEND_EGRESS_ALLOWLIST", "")
+    if not raw.strip():
+        return set()
+    entries: set[tuple[str, int]] = set()
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if ":" in entry:
+            host, _, port_str = entry.rpartition(":")
+            try:
+                entries.add((host.lower().rstrip("."), int(port_str)))
+            except ValueError:
+                continue
+        else:
+            # No port specified — allow on any port by using sentinel 0.
+            entries.add((entry.lower().rstrip("."), 0))
+    return entries
+
+
+def _is_host_allowlisted(hostname: str, port: int | None) -> bool:
+    """Return True if hostname:port is on the egress allowlist."""
+    allowlist = _parse_egress_allowlist()
+    if not allowlist:
+        return False
+    hostname = hostname.lower().rstrip(".")
+    # Check exact host:port match.
+    if port is not None and (hostname, port) in allowlist:
+        return True
+    # Check host-only match (port 0 sentinel means any port).
+    return (hostname, 0) in allowlist
+
+
 def log_finding(scanner: str, name: str, severity: str, detail: str, action: str):
     """Append a finding to the JSONL audit log."""
     trace_id = os.environ.get("FULLSEND_TRACE_ID", "")
@@ -175,6 +214,11 @@ def validate_url(url: str) -> str | None:
     if ip_reason:
         return ip_reason
 
+    # Determine the port for allowlist matching.
+    port = parsed.port
+    if port is None:
+        port = 443 if scheme == "https" else 80
+
     # DNS rebinding defense: resolve hostname and check resolved IPs
     prev_timeout = socket.getdefaulttimeout()
     try:
@@ -185,10 +229,11 @@ def validate_url(url: str) -> str | None:
             ip_reason = check_ip(resolved_ip)
             if ip_reason:
                 return f"DNS rebinding: {hostname} resolved to blocked {resolved_ip} ({ip_reason})"
-    except TimeoutError:
-        return f"DNS resolution timed out for {hostname} (fail-closed)"
-    except socket.gaierror:
-        return f"DNS resolution failed for {hostname} (fail-closed)"
+    except (TimeoutError, socket.gaierror):
+        # DNS resolution failed — allow if the host is on the egress
+        # allowlist (the L7 proxy will resolve and enforce the policy).
+        if not _is_host_allowlisted(hostname, port):
+            return f"DNS resolution failed for {hostname} (fail-closed)"
     finally:
         socket.setdefaulttimeout(prev_timeout)
 

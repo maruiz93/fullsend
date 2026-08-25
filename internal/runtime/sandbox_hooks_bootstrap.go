@@ -58,8 +58,8 @@ func installHookScripts(sandboxName, hooksDir string, hooks security.SandboxHook
 }
 
 // appendHookEnv appends the hook-related environment (TIRITH_FAIL_ON,
-// TIRITH_REQUIRED) to the sandbox workspace .env so the scripts see it
-// regardless of which runtime invokes them.
+// TIRITH_REQUIRED, FULLSEND_EGRESS_ALLOWLIST) to the sandbox workspace
+// .env so the scripts see it regardless of which runtime invokes them.
 func appendHookEnv(sandboxName string, hooks security.SandboxHookConfig) error {
 	if failOn := hooks.TirithFailOn(); failOn != "" {
 		escapedFailOn := strings.ReplaceAll(failOn, "'", "'\\''")
@@ -73,6 +73,14 @@ func appendHookEnv(sandboxName string, hooks security.SandboxHookConfig) error {
 		envCmd := fmt.Sprintf("echo 'export TIRITH_REQUIRED=1' >> %s/.env", sandbox.SandboxWorkspace)
 		if _, _, _, err := sandbox.Exec(sandboxName, envCmd, 10*time.Second); err != nil {
 			return fmt.Errorf("setting TIRITH_REQUIRED: %w", err)
+		}
+	}
+	if allowlist := hooks.SSRFEgressAllowlist(); allowlist != "" {
+		escapedAllowlist := strings.ReplaceAll(allowlist, "'", "'\\''")
+		envCmd := fmt.Sprintf("echo 'export FULLSEND_EGRESS_ALLOWLIST=%s' >> %s/.env",
+			escapedAllowlist, sandbox.SandboxWorkspace)
+		if _, _, _, err := sandbox.Exec(sandboxName, envCmd, 10*time.Second); err != nil {
+			return fmt.Errorf("setting FULLSEND_EGRESS_ALLOWLIST: %w", err)
 		}
 	}
 	return nil
